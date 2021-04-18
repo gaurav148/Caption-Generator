@@ -1,4 +1,9 @@
 from flask import Flask, render_template, request
+import requests
+
+# try:
+
+from bs4 import BeautifulSoup
 import cv2
 from keras.models import load_model
 import numpy as np
@@ -87,6 +92,26 @@ print("RESNET MODEL LOADED")
 app = Flask(__name__)
 
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 1
+
+
+def web_scrap_caption():
+
+    URL = "https://napoleoncat.com/blog/instagram-captions/"
+    page = requests.get(URL)
+
+    soup = BeautifulSoup(page.content, "html.parser")
+    # results = soup.find_all('div')
+    results = soup.findChildren("div", class_="article-content")
+    # page.content
+    captions = []
+    for i in results:
+        ul = i.find_all("ul")
+        for index, j in enumerate(ul):
+            if index != 0:
+                captions.append(j.text.split("."))
+    x = np.random.randint(0, len(captions))
+
+    return captions[0][x]
 
 
 def caption(image_path):
@@ -201,7 +226,7 @@ def after():
                 final = final + " " + sampled_word
 
             text_in.append(sampled_word)
-        return render_template("after.html", data=final)
+        return render_template("after.html", data=[final, web_scrap_caption()])
     except:
         return render_template("index.html")
 
