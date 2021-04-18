@@ -31,6 +31,64 @@ from keras.preprocessing.sequence import pad_sequences
 from tqdm import tqdm
 import base64
 
+from mysql.connector import connect
+
+
+def conn():
+    con = connect(
+        host="127.0.0.1", username="root", password="root", database="caption_generator"
+    )
+    cursor = con.cursor()
+    return con, cursor
+
+
+def close():
+    con, cursor = conn()
+    con.close()
+
+
+def insert_caption(caption, username):
+    con, cursor = conn()
+    query = f"INSERT INTO caption (caption_Data,usernameCaption) VALUES ('{caption}','{username}');"
+    print(query)
+    cursor.execute(query)
+    con.commit()
+    cursor.close()
+    con.close()
+
+
+def display_credential():
+    con, cursor = conn()
+    cursor.execute("SELECT * FROM CREDENTIAL")
+    state = cursor.fetchall()
+    close()
+    return state
+
+
+def insert_credential(username, passcode):
+    con, cursor = conn()
+    cursor.execute(
+        f"INSERT INTO credential (username,passcode) VALUES ('{username}','{passcode}')"
+    )
+    # cursor.execute(query)
+    con.commit()
+    cursor.close()
+    con.close()
+
+
+def display_caption(username):
+    con, cursor = conn()
+    cursor.execute(
+        f"SELECT caption_Data FROM caption WHERE caption.usernameCaption='{username}'"
+    )
+    state = cursor.fetchall()
+    close()
+    return state
+
+
+username = "nothing"
+password = ""
+
 vocab = np.load("vocab.npy", allow_pickle=True)
 
 vocab = vocab.item()
@@ -173,64 +231,118 @@ app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 1
 
 
 @app.route("/")
+def login():
+    # insert_caption("Hello this is caption", "ssm2")
+    return render_template("login.html")
+
+
+@app.route("/home", methods=["GET", "POST"])
 def index():
-    return render_template("index.html")
+
+    # username = request.username
+    if request.method == "POST":
+        global username, password
+        username = request.form["username"]
+        password = request.form["password"]
+        credential = display_credential()
+        print(credential)
+        for user, pas in credential:
+            if username == user and password == pas:
+                data = []
+                for i in display_caption(username):
+
+                    data.append(i[0])
+
+                return render_template("index.html", caption=[len(data), data])
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    global username, password
+    username = ""
+    password = ""
+    return render_template("login.html")
+
+
+@app.route("/register")
+def register():
+    return render_template("register.html")
+
+
+@app.route("/register2", methods=["GET", "POST"])
+def register2():
+    try:
+        if request.method == "POST":
+            # global username, password
+            username = request.form["username"]
+            password = request.form["password"]
+            insert_credential(username, password)
+            return render_template("login.html")
+    except:
+        return render_template("login.html")
 
 
 @app.route("/after", methods=["GET", "POST"])
 def after():
-    try:
-        img = request.files["file1"]
+    if username != "":
+        try:
+            img = request.files["file1"]
 
-        img.save("static/file.jpg")
+            img.save("static/file.jpg")
 
-        print("=" * 50)
-        print("IMAGE SAVED")
+            print("=" * 50)
+            print("IMAGE SAVED")
 
-        image = cv2.imread("static/file.jpg")
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image = cv2.imread("static/file.jpg")
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        image = cv2.resize(image, (224, 224))
+            image = cv2.resize(image, (224, 224))
 
-        image = np.reshape(image, (1, 224, 224, 3))
-        incept = resnet.predict(image).reshape(1, 2048)
+            image = np.reshape(image, (1, 224, 224, 3))
+            incept = resnet.predict(image).reshape(1, 2048)
 
-        print("=" * 50)
-        print("Predict Features")
+            print("=" * 50)
+            print("Predict Features")
 
-        text_in = ["startofseq"]
+            text_in = ["startofseq"]
 
-        final = ""
+            final = ""
 
-        print("=" * 50)
-        print("GETING Captions")
+            print("=" * 50)
+            print("GETING Captions")
 
-        count = 0
-        while tqdm(count < 20):
+            count = 0
+            while tqdm(count < 20):
 
-            count += 1
+                count += 1
 
-            encoded = []
-            for i in text_in:
-                encoded.append(vocab[i])
+                encoded = []
+                for i in text_in:
+                    encoded.append(vocab[i])
 
-            padded = pad_sequences(
-                [encoded], maxlen=max_len, padding="post", truncating="post"
-            ).reshape(1, max_len)
+                padded = pad_sequences(
+                    [encoded], maxlen=max_len, padding="post", truncating="post"
+                ).reshape(1, max_len)
 
-            sampled_index = np.argmax(model.predict([incept, padded]))
+                sampled_index = np.argmax(model.predict([incept, padded]))
 
-            sampled_word = inv_vocab[sampled_index]
+                sampled_word = inv_vocab[sampled_index]
 
-            if sampled_word != "endofseq":
-                final = final + " " + sampled_word
+                if sampled_word != "endofseq":
+                    final = final + " " + sampled_word
 
-            text_in.append(sampled_word)
-        return render_template("after.html", data=[final, web_scrap_caption()])
-    except:
-        return render_template("index.html")
+                text_in.append(sampled_word)
+            insert_caption(final, username)
+            print("Successfully added Caption")
+            return render_template("after.html", data=[final, web_scrap_caption()])
+        except:
+            print()
+            return render_template("index.html")
+    else:
+        return render_template("login.html")
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="127.0.0.1", port=8000)
+    app.run(debug=True)
 

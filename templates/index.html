@@ -54,6 +54,8 @@
           
         </ul>
         <i class="bi bi-list mobile-nav-toggle"></i>
+        <a href="/logout"><input type="submit" name="btn" value='LOGOUT' class='btn btn-warning'> </a>
+        <!-- <button >Logout</button></a> -->
       </nav><!-- .navbar -->
 
     </div>
@@ -76,9 +78,15 @@
                   <input class="btn-get-getstarted" type="file" required name='file1' style="line-height: normal;background-color: darkblue;border-radius: 24px;">
               <input type="submit" name="btn" value='PREDICT CAPTION' class='btn btn-warning'> 
               </form>
+             
               </a>
             </div>
           </div>
+          <h2 data-aos="fade-up" data-aos-delay="400">Your Previousouly Generated Caption</h2>
+          {%for i in range(0,caption[0])%}
+  
+          <p>{{caption[1][i]}}</p>
+           {%endfor%}
         </div>
         <div class="col-lg-6 hero-img" data-aos="zoom-out" data-aos-delay="200">
           <img src="../static/img/hero-img.png" class="img-fluid" alt="">
