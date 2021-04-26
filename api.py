@@ -30,6 +30,7 @@ import cv2
 from keras.preprocessing.sequence import pad_sequences
 from tqdm import tqdm
 import base64
+import calendar, time
 
 from mysql.connector import connect
 
@@ -47,9 +48,9 @@ def close():
     con.close()
 
 
-def insert_caption(caption, username):
+def insert_caption(caption, username, imageUrl):
     con, cursor = conn()
-    query = f"INSERT INTO caption (caption_Data,usernameCaption) VALUES ('{caption}','{username}');"
+    query = f"INSERT INTO caption (caption_Data,usernameCaption,imageUrl) VALUES ('{caption}','{username}','{imageUrl}');"
     print(query)
     cursor.execute(query)
     con.commit()
@@ -79,7 +80,7 @@ def insert_credential(username, passcode):
 def display_caption(username):
     con, cursor = conn()
     cursor.execute(
-        f"SELECT caption_Data FROM caption WHERE caption.usernameCaption='{username}'"
+        f"SELECT caption_Data,imageUrl FROM caption WHERE caption.usernameCaption='{username}'"
     )
     state = cursor.fetchall()
     close()
@@ -251,7 +252,7 @@ def index():
                 data = []
                 for i in display_caption(username):
 
-                    data.append(i[0])
+                    data.append([i[0], i[1]])
 
                 return render_template("index.html", caption=[len(data), data])
     return render_template("login.html")
@@ -283,18 +284,27 @@ def register2():
         return render_template("login.html")
 
 
+# imageUrl = ""
+
+
 @app.route("/after", methods=["GET", "POST"])
 def after():
     if username != "":
         try:
             img = request.files["file1"]
+            gmt = time.gmtime()
+            ts = calendar.timegm(gmt)
+            # global imageUrl
+            imageURL = ""
+            imageURL = "static/" + str(username) + "" + str(ts) + ".jpg"
+            print(imageURL)
 
-            img.save("static/file.jpg")
+            img.save(imageURL)
 
             print("=" * 50)
             print("IMAGE SAVED")
 
-            image = cv2.imread("static/file.jpg")
+            image = cv2.imread(imageURL)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
             image = cv2.resize(image, (224, 224))
@@ -333,7 +343,7 @@ def after():
                     final = final + " " + sampled_word
 
                 text_in.append(sampled_word)
-            insert_caption(final, username)
+            insert_caption(final, username, imageURL)
             print("Successfully added Caption")
             return render_template("after.html", data=[final, web_scrap_caption()])
         except:
